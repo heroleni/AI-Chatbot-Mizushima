@@ -10,7 +10,9 @@
 | `convertir_moneda` | `monto: float`, `de: str = "USD"`, `a: str = "COP"` | **ExchangeRate-API** (`open.er-api.com`) | Monto convertido, tasa y fecha de actualización |
 | `buscar_wikipedia` | `tema: str`, `idioma: str = "es"` | **Wikipedia REST**: búsqueda y resumen | Título, descripción, resumen y enlace |
 
-Las tres son servicios distintos, gratuitos y sin clave. Si una API no responde, la tool devuelve un mensaje claro ("No pude consultar…") y el servidor sigue funcionando.
+Las tres son servicios distintos, gratuitos y sin clave. Si un servicio está saturado (HTTP 429 o 5xx), la tool reintenta una vez. Si aun así no responde, devuelve un mensaje claro con el código del error ("No pude consultar… (HTTP 429)") y el servidor sigue funcionando.
+
+`clima` tiene además un **respaldo**: si Open-Meteo falla (pasa a veces en Render, porque muchos servicios comparten sus IP y Open-Meteo las limita), consulta **wttr.in**, que tampoco pide clave. Los resultados del clima se guardan 10 minutos para no repetir consultas.
 
 ### Notas
 

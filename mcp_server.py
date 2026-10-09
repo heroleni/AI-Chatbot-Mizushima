@@ -3,7 +3,7 @@ Mizushima MCP: servidor MCP de notas, tareas, skills y consultas a internet.
 
   TOOLS      → acciones que el cliente/agente ejecuta (14)
                · 3 consumen APIs públicas de internet (sin clave):
-                   clima          → Open-Meteo        (open-meteo.com)
+                   clima          → Open-Meteo        (open-meteo.com), respaldo wttr.in
                    convertir_moneda → ExchangeRate-API (exchangerate-api.com)
                    buscar_wikipedia → Wikipedia        (wikipedia.org)
   RESOURCES  → datos que se leen por URI: notas, tareas, skills e info del servidor
@@ -23,7 +23,7 @@ No pide autenticación: cualquier cliente MCP puede conectarse a la URL.
 
 Instalación: python -m pip install -r requirements-server.txt
 """
-import json, os, re, sys, datetime, unicodedata
+import asyncio, json, os, re, sys, time, datetime, unicodedata
 from pathlib import Path
 from urllib.parse import quote, unquote
 from zoneinfo import ZoneInfo
@@ -227,26 +227,60 @@ CLIMA_WMO = {
     95: "Tormenta eléctrica", 96: "Tormenta con granizo ligero", 99: "Tormenta con granizo fuerte",
 }
 
+def _codigo_http(e: Exception) -> str:
+    """'HTTP 429' si el error trae respuesta, o el nombre del error (ej. ConnectTimeout)."""
+    r = getattr(e, "response", None)
+    return f"HTTP {r.status_code}" if r is not None else type(e).__name__
+
+
+async def _get_json_reintento(url: str, params: dict | None = None) -> dict:
+    """Como _get_json, pero reintenta una vez si el servicio está saturado (429, 5xx) o tarda."""
+    try:
+        return await _get_json(url, params)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code != 429 and e.response.status_code < 500:
+            raise
+    except (httpx.TimeoutException, httpx.TransportError):
+        pass
+    await asyncio.sleep(1.5)
+    return await _get_json(url, params)
+
+
+_CACHE_CLIMA: dict = {}   # (ciudad, dias) → (momento, texto): evita repetir consultas por 10 min
+CACHE_SEGUNDOS = 600
+
+
 @mcp.tool()
 async def clima(ciudad: str, dias: int = 3) -> str:
-    """Clima actual y pronóstico (1 a 7 días) de una ciudad. API: Open-Meteo (open-meteo.com).
+    """Clima actual y pronóstico (1 a 7 días) de una ciudad. API: Open-Meteo (open-meteo.com),
+    con wttr.in como respaldo si Open-Meteo no responde.
     Ej: ciudad='Medellín'. Devuelve temperatura, sensación, humedad, viento y probabilidad de lluvia."""
     dias = max(1, min(int(dias), 7))
+    clave = (ciudad.strip().lower(), dias)
+    if clave in _CACHE_CLIMA and time.time() - _CACHE_CLIMA[clave][0] < CACHE_SEGUNDOS:
+        return _CACHE_CLIMA[clave][1]
     try:
-        geo = await _get_json("https://geocoding-api.open-meteo.com/v1/search",
-                              {"name": ciudad, "count": 1, "language": "es", "format": "json"})
+        geo = await _get_json_reintento("https://geocoding-api.open-meteo.com/v1/search",
+                                        {"name": ciudad, "count": 1, "language": "es", "format": "json"})
         if not geo.get("results"):
             return f"No encontré la ciudad '{ciudad}'. Prueba con otro nombre (ej: 'Bogotá' o 'Madrid')."
         lugar = geo["results"][0]
-        datos = await _get_json("https://api.open-meteo.com/v1/forecast", {
+        datos = await _get_json_reintento("https://api.open-meteo.com/v1/forecast", {
             "latitude": lugar["latitude"], "longitude": lugar["longitude"],
             "current": "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m",
             "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
             "timezone": "auto", "forecast_days": dias,
         })
     except httpx.HTTPError as e:
-        return f"No pude consultar Open-Meteo ({type(e).__name__}). Intenta de nuevo en un momento."
+        texto = await _clima_respaldo(ciudad, dias, motivo=_codigo_http(e))
+    else:
+        texto = _formato_open_meteo(lugar, datos)
+    if not texto.startswith("No pude"):
+        _CACHE_CLIMA[clave] = (time.time(), texto)
+    return texto
 
+
+def _formato_open_meteo(lugar: dict, datos: dict) -> str:
     nombre = ", ".join(x for x in (lugar.get("name"), lugar.get("admin1"), lugar.get("country")) if x)
     a = datos.get("current", {})
     lineas = [
@@ -267,17 +301,49 @@ async def clima(ciudad: str, dias: int = 3) -> str:
     return "\n".join(lineas)
 
 
+async def _clima_respaldo(ciudad: str, dias: int, motivo: str) -> str:
+    """Respaldo con wttr.in (sin clave, máximo 3 días) cuando Open-Meteo falla."""
+    def valor(lista, campo="value"):
+        return (lista or [{}])[0].get(campo, "") if isinstance(lista, list) else ""
+    try:
+        d = await _get_json_reintento(f"https://wttr.in/{quote(ciudad)}", {"format": "j1", "lang": "es"})
+    except httpx.HTTPError as e:
+        return (f"No pude consultar el clima: Open-Meteo ({motivo}) y wttr.in ({_codigo_http(e)}) "
+                "no respondieron. Intenta de nuevo en un momento.")
+    actual = (d.get("current_condition") or [{}])[0]
+    area = (d.get("nearest_area") or [{}])[0]
+    nombre = ", ".join(x for x in (valor(area.get("areaName")), valor(area.get("region")),
+                                   valor(area.get("country"))) if x) or ciudad
+    descripcion = valor(actual.get("lang_es")) or valor(actual.get("weatherDesc")) or "condición desconocida"
+    lineas = [
+        f"Clima en {nombre}",
+        f"Ahora: {actual.get('temp_C', '?')} °C (sensación {actual.get('FeelsLikeC', '?')} °C), "
+        f"{descripcion}, humedad {actual.get('humidity', '?')} %, viento {actual.get('windspeedKmph', '?')} km/h",
+        "Pronóstico:",
+    ]
+    for dia in (d.get("weather") or [])[:dias]:
+        lluvias = [int(h.get("chanceofrain", 0) or 0) for h in dia.get("hourly", [])]
+        lineas.append(f"- {dia.get('date', '?')}: máx {dia.get('maxtempC', '?')} °C / mín {dia.get('mintempC', '?')} °C"
+                      + (f", prob. de lluvia {max(lluvias)} %" if lluvias else ""))
+    if dias > 3:
+        lineas.append("(El servicio de respaldo solo da 3 días de pronóstico.)")
+    lineas.append(f"Fuente: wttr.in (https://wttr.in), respaldo porque Open-Meteo no respondió ({motivo})")
+    return "\n".join(lineas)
+
+
 @mcp.tool()
 async def convertir_moneda(monto: float, de: str = "USD", a: str = "COP") -> str:
     """Convierte dinero entre monedas con la tasa del día. API: ExchangeRate-API (exchangerate-api.com).
     Usa códigos ISO 4217: USD, COP, EUR, MXN, ARS, BRL, GBP, JPY... Ej: monto=100, de='USD', a='COP'."""
     de, a = de.strip().upper(), a.strip().upper()
     try:
-        datos = await _get_json(f"https://open.er-api.com/v6/latest/{quote(de)}")
-    except httpx.HTTPStatusError:
-        return f"Moneda de origen no válida: '{de}'. Usa un código ISO como USD, COP o EUR."
+        datos = await _get_json_reintento(f"https://open.er-api.com/v6/latest/{quote(de)}")
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            return f"Moneda de origen no válida: '{de}'. Usa un código ISO como USD, COP o EUR."
+        return f"No pude consultar ExchangeRate-API ({_codigo_http(e)}). Intenta de nuevo en un momento."
     except httpx.HTTPError as e:
-        return f"No pude consultar ExchangeRate-API ({type(e).__name__}). Intenta de nuevo en un momento."
+        return f"No pude consultar ExchangeRate-API ({_codigo_http(e)}). Intenta de nuevo en un momento."
     if datos.get("result") != "success":
         return f"Moneda de origen no válida: '{de}' ({datos.get('error-type', 'error')}). Usa códigos como USD, COP, EUR."
     tasa = datos.get("rates", {}).get(a)
@@ -299,13 +365,13 @@ async def buscar_wikipedia(tema: str, idioma: str = "es") -> str:
         return "Idioma inválido: usa un código como es, en o pt."
     base = f"https://{idioma}.wikipedia.org"
     try:
-        busqueda = await _get_json(f"{base}/w/rest.php/v1/search/page", {"q": tema, "limit": 1})
+        busqueda = await _get_json_reintento(f"{base}/w/rest.php/v1/search/page", {"q": tema, "limit": 1})
         paginas = busqueda.get("pages") or []
         if not paginas:
             return f"No encontré '{tema}' en Wikipedia ({idioma})."
-        resumen = await _get_json(f"{base}/api/rest_v1/page/summary/{quote(paginas[0]['key'], safe='')}")
+        resumen = await _get_json_reintento(f"{base}/api/rest_v1/page/summary/{quote(paginas[0]['key'], safe='')}")
     except httpx.HTTPError as e:
-        return f"No pude consultar Wikipedia ({type(e).__name__}). Intenta de nuevo en un momento."
+        return f"No pude consultar Wikipedia ({_codigo_http(e)}). Intenta de nuevo en un momento."
     url = resumen.get("content_urls", {}).get("desktop", {}).get("page", f"{base}/wiki/{paginas[0]['key']}")
     partes = [f"{resumen.get('title', paginas[0]['title'])}"]
     if resumen.get("description"):
@@ -325,7 +391,7 @@ def recurso_info() -> str:
     return json.dumps({
         "nombre": "Mizushima MCP", "version": VERSION,
         "apis_externas": {
-            "clima": "Open-Meteo (https://open-meteo.com)",
+            "clima": "Open-Meteo (https://open-meteo.com), respaldo wttr.in (https://wttr.in)",
             "convertir_moneda": "ExchangeRate-API (https://www.exchangerate-api.com)",
             "buscar_wikipedia": "Wikipedia REST (https://www.wikipedia.org)",
         },

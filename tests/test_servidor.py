@@ -32,6 +32,11 @@ def datos_temporales(tmp_path, monkeypatch):
     monkeypatch.setattr(srv, "NOTAS", tmp_path / "notas.json")
     monkeypatch.setattr(srv, "TAREAS", tmp_path / "tareas.json")
     monkeypatch.setattr(srv, "SKILLS", tmp_path / "skills")
+    srv._CACHE_CLIMA.clear()
+
+    async def sin_espera(_):  # los reintentos no esperan en las pruebas
+        return None
+    monkeypatch.setattr(srv.asyncio, "sleep", sin_espera)
 
 
 # ── APIs simuladas con respuestas reales de ejemplo ──
@@ -133,6 +138,35 @@ def test_buscar_wikipedia(apis):
     r = texto(correr(srv.mcp.call_tool("buscar_wikipedia", {"tema": "Medellín"})))
     assert "capital del departamento de Antioquia" in r
     assert "https://es.wikipedia.org/wiki/" in r
+
+
+def test_clima_usa_respaldo_si_open_meteo_falla(monkeypatch):
+    llamadas = []
+
+    async def falso(url, params=None):
+        llamadas.append(url)
+        if "open-meteo" in url:
+            raise httpx.HTTPStatusError("429", request=httpx.Request("GET", url), response=httpx.Response(429))
+        return {
+            "current_condition": [{"temp_C": "20", "FeelsLikeC": "21", "humidity": "80", "windspeedKmph": "7",
+                                   "weatherDesc": [{"value": "Partly cloudy"}], "lang_es": [{"value": "Parcialmente nublado"}]}],
+            "nearest_area": [{"areaName": [{"value": "Medellin"}], "region": [{"value": "Antioquia"}],
+                              "country": [{"value": "Colombia"}]}],
+            "weather": [{"date": "2026-10-09", "maxtempC": "26", "mintempC": "16",
+                         "hourly": [{"chanceofrain": "10"}, {"chanceofrain": "65"}]}],
+        }
+    monkeypatch.setattr(srv, "_get_json", falso)
+    r = texto(correr(srv.mcp.call_tool("clima", {"ciudad": "Medellín", "dias": 1})))
+    assert "Fuente: wttr.in" in r and "HTTP 429" in r
+    assert "20 °C" in r and "Parcialmente nublado" in r and "prob. de lluvia 65 %" in r
+    assert sum("open-meteo" in u for u in llamadas) == 2  # reintentó una vez antes del respaldo
+
+
+def test_clima_usa_cache(apis):
+    correr(srv.mcp.call_tool("clima", {"ciudad": "Medellín"}))
+    antes = len(apis)
+    correr(srv.mcp.call_tool("clima", {"ciudad": "medellín"}))
+    assert len(apis) == antes
 
 
 def test_api_caida_no_rompe_el_servidor(monkeypatch):

@@ -63,7 +63,8 @@ async def verificar(url: str) -> bool:
                 except Exception as e:
                     res = f"error: {e}"
                 funciona = fuente in res and "No pude" not in res
-                check(funciona, f"{nombre} → {fuente}")
+                respaldo = "  (usó el respaldo wttr.in)" if "Fuente: wttr.in" in res else ""
+                check(funciona, f"{nombre} → {fuente}{respaldo}")
                 print("      " + res.splitlines()[0][:100] if res else "")
 
             res = await s.read_resource("skills://indice")
