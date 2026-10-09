@@ -2,6 +2,14 @@
 
 Servidor **MCP** (Model Context Protocol) con tools, recursos, prompts y skills, desplegado en internet **sin autenticación** para que cualquier cliente MCP lo use. Incluye a **Mizushima**, un agente por terminal (OpenAI o Gemini) que se conecta a ese servidor desde cualquier computador.
 
+| | |
+|---|---|
+| **Servidor MCP** | **https://mizushima-mcp.onrender.com/mcp** (Streamable HTTP, sin autenticación) |
+| Información del servidor | https://mizushima-mcp.onrender.com |
+| Repositorio | https://github.com/heroleni/AI-Chatbot-Mizushima |
+
+> Está en el plan gratis de Render: si lleva más de 15 minutos sin uso, la primera petición tarda unos 50 segundos.
+
 ```
             ┌──────────────────────── Mizushima MCP (mcp_server.py) ────────────────────────┐
             │  14 tools · 6 recursos + 2 plantillas · 9 prompts · skills en skills/*.md      │
@@ -27,7 +35,7 @@ Servidor **MCP** (Model Context Protocol) con tools, recursos, prompts y skills,
 | Desplegado para cualquier cliente | Render (siempre activo) y ngrok (local). Streamable HTTP con respuestas JSON: funciona hasta con `curl` |
 | Sin autenticación | El servidor no pide token, clave ni usuario |
 | Skill para agentes | [`agent-skills/mizushima-mcp/SKILL.md`](agent-skills/mizushima-mcp/SKILL.md) |
-| Documentación y código | Este README, la carpeta [`docs/`](docs/) y las pruebas en [`tests/`](tests/) |
+| Documentación y código | Este README y la carpeta [`docs/`](docs/): [código](docs/CODIGO.md), [agente](docs/AGENTE.md) y [skills](docs/SKILLS.md). 16 pruebas en [`tests/`](tests/) |
 
 ## Inicio rápido
 
@@ -67,6 +75,9 @@ AI-Chatbot-Mizushima/
 ├── .env.example               Variables de entorno
 ├── .vscode/                   Tareas, depuración y mcp.json para VS Code
 └── docs/
+    ├── CODIGO.md              Arquitectura y explicación del código
+    ├── AGENTE.md              Agente Mizushima: cómo funciona y comandos
+    ├── SKILLS.md              Skills del servidor y skill para agentes
     ├── DESPLIEGUE.md          Local, ngrok, Render y WSL paso a paso
     ├── CLIENTES.md            Cómo conectarse desde cualquier cliente
     ├── REFERENCIA.md          Detalle de tools, recursos y prompts
@@ -81,6 +92,9 @@ AI-Chatbot-Mizushima/
 
 ## Documentación
 
+- [Código: arquitectura y funcionamiento](docs/CODIGO.md)
+- [Agente Mizushima](docs/AGENTE.md)
+- [Skills: del servidor y para agentes](docs/SKILLS.md)
 - [Despliegue: local, ngrok y Render](docs/DESPLIEGUE.md)
 - [Conectarse desde cualquier cliente](docs/CLIENTES.md)
 - [Referencia de tools, recursos y prompts](docs/REFERENCIA.md)
@@ -88,7 +102,7 @@ AI-Chatbot-Mizushima/
 
 ## APIs externas y atribución
 
-- Clima: [Open-Meteo](https://open-meteo.com), licencia CC BY 4.0.
+- Clima: [Open-Meteo](https://open-meteo.com), licencia CC BY 4.0. Respaldo: [wttr.in](https://wttr.in).
 - Tasas de cambio: [Rates By Exchange Rate API](https://www.exchangerate-api.com).
 - Enciclopedia: [Wikipedia](https://www.wikipedia.org), licencia CC BY-SA.
 
