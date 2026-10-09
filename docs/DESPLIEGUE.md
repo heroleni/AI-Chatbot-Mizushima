@@ -77,7 +77,7 @@ Render ejecuta el servidor en la nube, sin tu PC. El archivo `render.yaml` ya tr
 cd ~/mizushima
 git init && git add . && git commit -m "Mizushima MCP"
 git branch -M main
-git remote add origin https://github.com/TU_USUARIO/AI-Chatbot-Mizushima.git
+git remote add origin https://github.com/heroleni/AI-Chatbot-Mizushima.git
 git push -u origin main
 ```
 

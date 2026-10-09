@@ -21,7 +21,7 @@
 > **Link del MCP (sin autenticación):** https://mizushima-mcp.onrender.com/mcp
 > Al abrir https://mizushima-mcp.onrender.com en el navegador se ve la información del servidor. Está en el plan gratis de Render: si lleva un rato sin uso, la primera petición tarda unos 50 segundos.
 >
-> **Repositorio (código y documentación):** https://github.com/TU_USUARIO/AI-Chatbot-Mizushima
+> **Repositorio (código y documentación):** https://github.com/heroleni/AI-Chatbot-Mizushima
 >
 > **Qué incluye:**
 > - 14 herramientas. Tres consumen APIs de servicios en la nube distintos: `clima` (Open-Meteo), `convertir_moneda` (ExchangeRate-API) y `buscar_wikipedia` (Wikipedia).
