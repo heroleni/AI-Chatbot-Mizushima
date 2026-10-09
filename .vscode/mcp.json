@@ -1,0 +1,24 @@
+{
+  // Servidores MCP para el chat de VS Code (Copilot Chat → modo Agent → icono de herramientas).
+  // Pulsa "Start" encima del que quieras usar. Ninguno pide autenticación.
+  "servers": {
+    // Local: VS Code lanza mcp_server.py él solo
+    "mizushima-local": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["${workspaceFolder}/mcp_server.py"]
+    },
+    // Remoto: Render, ngrok o el servidor HTTP de este PC (pide la URL al arrancar)
+    "mizushima-remoto": {
+      "type": "http",
+      "url": "${input:url-mcp}/mcp"
+    }
+  },
+  "inputs": [
+    {
+      "id": "url-mcp",
+      "type": "promptString",
+      "description": "URL del servidor sin /mcp (ej: https://mizushima-mcp.onrender.com, https://xxxx.ngrok-free.app o http://127.0.0.1:8000)"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+__pycache__/
+.venv/
+.venv-linux/
+.pytest_cache/
+.env
+notas.json
+tareas.json
+memoria_larga.json

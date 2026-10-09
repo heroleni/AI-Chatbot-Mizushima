@@ -1,0 +1,5 @@
+# Solo lo que necesita el SERVIDOR MCP (lo usa Render: instala rápido)
+mcp>=1.26,<2   # la v2 renombró FastMCP: este proyecto usa la v1
+httpx
+uvicorn
+python-dotenv

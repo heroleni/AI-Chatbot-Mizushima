@@ -1,0 +1,76 @@
+{
+  // Ctrl+Shift+P → "Tasks: Run Task" → elige una.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Instalar dependencias",
+      "type": "shell",
+      "command": "python -m pip install -r requirements.txt",
+      "problemMatcher": []
+    },
+    {
+      "label": "Pruebas automáticas (pytest)",
+      "type": "shell",
+      "command": "python -m pytest -v",
+      "group": "test",
+      "problemMatcher": []
+    },
+
+    // ── Despliegue local ──
+    {
+      "label": "MCP: servidor HTTP (puerto 8000)",
+      "type": "shell",
+      "command": "python mcp_server.py",
+      "options": { "env": { "MCP_TRANSPORT": "streamable-http", "PORT": "8000" } },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": { "regexp": "^__nunca__$" },
+        "background": { "activesBegin": true, "beginsPattern": ".", "endsPattern": "Servidor MCP Mizushima en" }
+      },
+      "presentation": { "panel": "dedicated", "group": "despliegue" }
+    },
+    {
+      "label": "ngrok: exponer puerto 8000",
+      "type": "shell",
+      "command": "ngrok http 8000 --host-header=rewrite",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "group": "despliegue" }
+    },
+    {
+      "label": "Despliegue local: servidor + ngrok",
+      "dependsOrder": "sequence",
+      "dependsOn": ["MCP: servidor HTTP (puerto 8000)", "ngrok: exponer puerto 8000"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Verificar un despliegue (Render / ngrok)",
+      "type": "shell",
+      "command": "python verificar_despliegue.py \"${input:url-mcp}\"",
+      "problemMatcher": []
+    },
+
+    // ── Agente por terminal ──
+    {
+      "label": "Agente (servidor local)",
+      "type": "shell",
+      "command": "python agente_mcp.py",
+      "presentation": { "panel": "dedicated", "focus": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Agente → servidor remoto (Render / ngrok)",
+      "type": "shell",
+      "command": "python agente_mcp.py --url \"${input:url-mcp}\"",
+      "presentation": { "panel": "dedicated", "focus": true },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "url-mcp",
+      "type": "promptString",
+      "description": "URL del servidor (ej: https://mizushima-mcp.onrender.com o https://xxxx.ngrok-free.app)"
+    }
+  ]
+}

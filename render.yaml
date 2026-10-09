@@ -1,0 +1,18 @@
+# Despliegue en Render (https://render.com) — plan gratis.
+# En Render: New → Blueprint → elige tu repositorio de GitHub. Render lee este archivo.
+services:
+  - type: web
+    name: mizushima-mcp
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-server.txt
+    startCommand: python mcp_server.py
+    healthCheckPath: /salud
+    autoDeploy: true
+    envVars:
+      - key: MCP_TRANSPORT
+        value: streamable-http
+      - key: HOST
+        value: 0.0.0.0
+      - key: PYTHON_VERSION
+        value: 3.12.7

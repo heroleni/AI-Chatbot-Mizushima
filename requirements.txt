@@ -1,0 +1,11 @@
+# Servidor MCP
+-r requirements-server.txt
+# Agente por terminal (Mizushima)
+langchain
+langgraph
+langchain-openai
+langchain-google-genai
+langchain-mcp-adapters
+ddgs
+# Pruebas
+pytest

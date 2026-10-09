@@ -1,0 +1,23 @@
+{
+  // Depuración con F5 (requiere la extensión Python de Microsoft).
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Servidor MCP (HTTP :8000)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/mcp_server.py",
+      "env": { "MCP_TRANSPORT": "streamable-http", "PORT": "8000" },
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Agente MCP (stdio)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/agente_mcp.py",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    }
+  ]
+}
